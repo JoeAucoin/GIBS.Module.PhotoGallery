@@ -1,0 +1,79 @@
+@using GIBS.Module.PhotoGallery.Services
+@using GIBS.Module.PhotoGallery.Models
+
+@namespace GIBS.Module.PhotoGallery
+@inherits ModuleBase
+@inject IPhotoGalleryService PhotoGalleryService
+@inject NavigationManager NavigationManager
+@inject IStringLocalizer<Index> Localizer
+
+@if (_PhotoGallerys == null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <ActionLink Action="Add" Security="SecurityAccessLevel.Edit" Text="Add PhotoGallery" ResourceKey="Add" />
+    <br />
+    <br />
+    @if (@_PhotoGallerys.Count != 0)
+    {
+        <Pager Items="@_PhotoGallerys">
+            <Header>
+                <th style="width: 1px;">&nbsp;</th>
+                <th style="width: 1px;">&nbsp;</th>
+                <th>@Localizer["Name"]</th>
+            </Header>
+            <Row>
+                <td><ActionLink Action="Edit" Parameters="@($"id=" + context.PhotoGalleryId.ToString())" ResourceKey="Edit"  /></td>
+                <td><ActionDialog Header="Delete PhotoGallery" Message="Are You Sure You Wish To Delete This PhotoGallery?" Action="Delete" Security="SecurityAccessLevel.Edit" Class="btn btn-danger" OnClick="@(async () => await Delete(context))" ResourceKey="Delete"  Id="@context.PhotoGalleryId.ToString()" /></td>
+                <td>@context.Name</td>
+            </Row>
+        </Pager>
+    }
+    else
+    {
+        <p>@Localizer["Message.DisplayNone"]</p>
+    }
+}
+
+@code {
+    public override string RenderMode => RenderModes.Static;
+
+    public override List<Resource> Resources => new List<Resource>()
+    {
+        new Stylesheet("_content/GIBS.Module.PhotoGallery/Module.css"),
+        new Script("_content/GIBS.Module.PhotoGallery/Module.js")
+    };
+
+    List<PhotoGallery> _PhotoGallerys;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _PhotoGallerys = await PhotoGalleryService.GetPhotoGallerysAsync(ModuleState.ModuleId);
+        }
+        catch (Exception ex)
+        {
+            await logger.LogError(ex, "Error Loading PhotoGallery {Error}", ex.Message);
+            AddModuleMessage(Localizer["Message.LoadError"], MessageType.Error);
+        }
+    }
+
+    private async Task Delete(PhotoGallery PhotoGallery)
+    {
+        try
+        {
+            await PhotoGalleryService.DeletePhotoGalleryAsync(PhotoGallery.PhotoGalleryId, ModuleState.ModuleId);
+            await logger.LogInformation("PhotoGallery Deleted {PhotoGallery}", PhotoGallery);
+            _PhotoGallerys = await PhotoGalleryService.GetPhotoGallerysAsync(ModuleState.ModuleId);
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            await logger.LogError(ex, "Error Deleting PhotoGallery {PhotoGallery} {Error}", PhotoGallery, ex.Message);
+            AddModuleMessage(Localizer["Message.DeleteError"], MessageType.Error);
+        }
+    }
+}

@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/_Oqtane/">
+    <Project Path="../oqtane.framework/Oqtane.Client/Oqtane.Client.csproj" />
+    <Project Path="../oqtane.framework/Oqtane.Shared/Oqtane.Shared.csproj" />
+    <Project Path="..\oqtane.framework\Oqtane.Server\Oqtane.Server.csproj" />
+  </Folder>
+  <Project Path="Client\GIBS.Module.PhotoGallery.Client.csproj" />
+  <Project Path="Package\GIBS.Module.PhotoGallery.Package.csproj" />
+  <Project Path="Server\GIBS.Module.PhotoGallery.Server.csproj" />
+  <Project Path="Shared\GIBS.Module.PhotoGallery.Shared.csproj" />
+</Solution>
