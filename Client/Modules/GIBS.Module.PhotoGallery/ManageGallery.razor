@@ -79,7 +79,7 @@
                         <Label Class="col-sm-3" For="parent" HelpText="Select a parent album" ResourceKey="ParentAlbumId">Parent Album: </Label>
                         <div class="col-sm-9">
                             <select id="parent" @bind="_activeAlbum.ParentAlbumId" class="form-control">
-                                <option value=""></option>
+                                <option value="">-- None --</option>
                                 @if (_albums != null)
                                 {
                                     @foreach (var album in _albums.Where(a => a.AlbumId != _activeAlbum.AlbumId))
@@ -119,7 +119,7 @@
                         <Label Class="col-sm-3" For="item-album" HelpText="Select an album for the photo">Album: </Label>
                         <div class="col-sm-9">
                             <select id="item-album" @bind="SelectedPhotoAlbumId" class="form-control" required>
-                                <option value=""></option>
+                                <option value="">-- Select Album --</option>
                                 @if (_albums != null)
                                 {
                                     @foreach (var album in _albums)
@@ -173,9 +173,9 @@
                     <div class="row mb-3">
                         <Label Class="col-sm-3" For="upload">File:</Label>
                         <div class="col-sm-9">
-                            <FileManager UploadMultiple="false" Filter="jpg,png,gif,jpeg,pdf"
+                            <FileManager UploadMultiple="false" Filter="jpg,png,gif,jpeg"
                                          FolderId="@_folderId"
-                                         ShowSuccess="true" ShowFolders="false" ShowFiles="false" ShowImage="false"
+                                         ShowSuccess="false" ShowFolders="false" ShowFiles="false" ShowImage="false" ShowUpload="true"
                                          OnUpload="@HandleFileUpload" />
                         </div>
                     </div>
@@ -280,7 +280,7 @@
         }
     </TabPanel>
     <TabPanel Name="BulkUpload" Heading="Bulk Upload">
-        <h2>Coming </h2>
+        <h2>Coming Soon</h2>
     </TabPanel>
 </TabStrip>
 
@@ -705,7 +705,9 @@
             ApplyFilters();
             _activePhoto = null;
             photoValidated = false;
+            AddPhoto();
             StateHasChanged();
+            
         }
         catch (Exception ex)
         {

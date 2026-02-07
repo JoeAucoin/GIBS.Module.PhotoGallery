@@ -818,7 +818,20 @@
 }
 
 .pw-detail-desc {
-    color: #ccc;
+    
+    font-size: 18px;
+    line-height: 1.5;
+    margin: 4px 0 0 0;
+}
+
+.pw-slideshow-title {
+    color: #333;
+    font-size: 16px;
+    line-height: 1.5;
+    margin: 4px 0 0 0;
+}
+.pw-slideshow-desc {
+    color: #555;
     font-size: 14px;
     line-height: 1.5;
     margin: 4px 0 0 0;
