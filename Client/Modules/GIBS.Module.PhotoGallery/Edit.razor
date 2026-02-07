@@ -4,7 +4,7 @@
 
 @namespace GIBS.Module.PhotoGallery
 @inherits ModuleBase
-@inject IPhotoGalleryService PhotoGalleryService
+@inject IAlbumService AlbumService
 @inject NavigationManager NavigationManager
 @inject IStringLocalizer<Edit> Localizer
 
@@ -55,10 +55,10 @@
             if (PageState.Action == "Edit")
             {
                 _id = Int32.Parse(PageState.QueryString["id"]);
-                PhotoGallery PhotoGallery = await PhotoGalleryService.GetPhotoGalleryAsync(_id, ModuleState.ModuleId);
+                Album PhotoGallery = await AlbumService.GetAlbumAsync(_id, ModuleState.ModuleId);
                 if (PhotoGallery != null)
                 {
-                    _name = PhotoGallery.Name;
+                    _name = PhotoGallery.AlbumName;
                     _createdby = PhotoGallery.CreatedBy;
                     _createdon = PhotoGallery.CreatedOn;
                     _modifiedby = PhotoGallery.ModifiedBy;
@@ -68,7 +68,7 @@
         }
         catch (Exception ex)
         {
-            await logger.LogError(ex, "Error Loading PhotoGallery {PhotoGalleryId} {Error}", _id, ex.Message);
+            await logger.LogError(ex, "Error Loading Album {AlbumId} {Error}", _id, ex.Message);
             AddModuleMessage(Localizer["Message.LoadError"], MessageType.Error);
         }
     }
@@ -83,18 +83,18 @@
             {
                 if (PageState.Action == "Add")
                 {
-                    PhotoGallery PhotoGallery = new PhotoGallery();
+                    Album PhotoGallery = new Album();
                     PhotoGallery.ModuleId = ModuleState.ModuleId;
-                    PhotoGallery.Name = _name;
-                    PhotoGallery = await PhotoGalleryService.AddPhotoGalleryAsync(PhotoGallery);
-                    await logger.LogInformation("PhotoGallery Added {PhotoGallery}", PhotoGallery);
+                    PhotoGallery.AlbumName = _name;
+                    PhotoGallery = await AlbumService.AddAlbumAsync(PhotoGallery);
+                    await logger.LogInformation("Album Added {Album}", PhotoGallery);
                 }
                 else
                 {
-                    PhotoGallery PhotoGallery = await PhotoGalleryService.GetPhotoGalleryAsync(_id, ModuleState.ModuleId);
-                    PhotoGallery.Name = _name;
-                    await PhotoGalleryService.UpdatePhotoGalleryAsync(PhotoGallery);
-                    await logger.LogInformation("PhotoGallery Updated {PhotoGallery}", PhotoGallery);
+                    Album PhotoGallery = await AlbumService.GetAlbumAsync(_id, ModuleState.ModuleId);
+                    PhotoGallery.AlbumName = _name;
+                    await AlbumService.UpdateAlbumAsync(PhotoGallery);
+                    await logger.LogInformation("Album Updated {Album}", PhotoGallery);
                 }
                 NavigationManager.NavigateTo(NavigateUrl());
             }

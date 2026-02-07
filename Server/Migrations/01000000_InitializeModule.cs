@@ -17,14 +17,32 @@ namespace GIBS.Module.PhotoGallery.Migrations
 
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            var entityBuilder = new PhotoGalleryEntityBuilder(migrationBuilder, ActiveDatabase);
-            entityBuilder.Create();
+            var albumEntityBuilder = new AlbumEntityBuilder(migrationBuilder, ActiveDatabase);
+            albumEntityBuilder.Create();
+
+            var photoEntityBuilder = new PhotoEntityBuilder(migrationBuilder, ActiveDatabase); 
+            photoEntityBuilder.Create();
+
+            var tagsEntityBuilder = new TagsEntityBuilder(migrationBuilder, ActiveDatabase);
+            tagsEntityBuilder.Create();
+
+            var photoTagsEntityBuilder = new PhotoTagsEntityBuilder(migrationBuilder, ActiveDatabase);
+            photoTagsEntityBuilder.Create();
         }
 
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            var entityBuilder = new PhotoGalleryEntityBuilder(migrationBuilder, ActiveDatabase);
-            entityBuilder.Drop();
+            var photoTagsEntityBuilder = new PhotoTagsEntityBuilder(migrationBuilder, ActiveDatabase);
+            photoTagsEntityBuilder.Drop();
+
+            var tagsEntityBuilder = new TagsEntityBuilder(migrationBuilder, ActiveDatabase);
+            tagsEntityBuilder.Drop();
+
+            var photoEntityBuilder = new PhotoEntityBuilder(migrationBuilder, ActiveDatabase);
+            photoEntityBuilder.Drop();
+
+            var albumEntityBuilder = new AlbumEntityBuilder(migrationBuilder, ActiveDatabase);
+            albumEntityBuilder.Drop();
         }
     }
 }

@@ -21,7 +21,14 @@ namespace GIBS.Module.PhotoGallery.Startup
 
         public void ConfigureServices(IServiceCollection services)
         {
-            services.AddTransient<IPhotoGalleryService, ServerPhotoGalleryService>();
+            services.AddTransient<IAlbumService, ServerAlbumService>();
+            services.AddTransient<IPhotoService, ServerPhotoService>();
+            services.AddTransient<ITagService, ServerTagService>();
+            services.AddTransient<IPhotoTagService, ServerPhotoTagService>();
+            services.AddTransient<IAlbumRepository, AlbumRepository>();
+            services.AddTransient<IPhotoRepository, PhotoRepository>();
+            services.AddTransient<ITagRepository, TagRepository>();
+            services.AddTransient<IPhotoTagRepository, PhotoTagRepository>();
             services.AddDbContextFactory<PhotoGalleryContext>(opt => { }, ServiceLifetime.Transient);
         }
     }

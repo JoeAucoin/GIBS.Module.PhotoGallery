@@ -15,12 +15,12 @@ namespace GIBS.Module.PhotoGallery.Manager
 {
     public class PhotoGalleryManager : MigratableModuleBase, IInstallable, IPortable, ISearchable
     {
-        private readonly IPhotoGalleryRepository _PhotoGalleryRepository;
+        private readonly IAlbumRepository _albumRepository;
         private readonly IDBContextDependencies _DBContextDependencies;
 
-        public PhotoGalleryManager(IPhotoGalleryRepository PhotoGalleryRepository, IDBContextDependencies DBContextDependencies)
+        public PhotoGalleryManager(IAlbumRepository albumRepository, IDBContextDependencies DBContextDependencies)
         {
-            _PhotoGalleryRepository = PhotoGalleryRepository;
+            _albumRepository = albumRepository;
             _DBContextDependencies = DBContextDependencies;
         }
 
@@ -37,7 +37,7 @@ namespace GIBS.Module.PhotoGallery.Manager
         public string ExportModule(Oqtane.Models.Module module)
         {
             string content = "";
-            List<Models.PhotoGallery> PhotoGallerys = _PhotoGalleryRepository.GetPhotoGallerys(module.ModuleId).ToList();
+            List<Models.Album> PhotoGallerys = _albumRepository.GetAlbums(module.ModuleId).ToList();
             if (PhotoGallerys != null)
             {
                 content = JsonSerializer.Serialize(PhotoGallerys);
@@ -47,16 +47,16 @@ namespace GIBS.Module.PhotoGallery.Manager
 
         public void ImportModule(Oqtane.Models.Module module, string content, string version)
         {
-            List<Models.PhotoGallery> PhotoGallerys = null;
+            List<Models.Album> PhotoGallerys = null;
             if (!string.IsNullOrEmpty(content))
             {
-                PhotoGallerys = JsonSerializer.Deserialize<List<Models.PhotoGallery>>(content);
+                PhotoGallerys = JsonSerializer.Deserialize<List<Models.Album>>(content);
             }
             if (PhotoGallerys != null)
             {
                 foreach(var PhotoGallery in PhotoGallerys)
                 {
-                    _PhotoGalleryRepository.AddPhotoGallery(new Models.PhotoGallery { ModuleId = module.ModuleId, Name = PhotoGallery.Name });
+                    _albumRepository.AddAlbum(new Models.Album { ModuleId = module.ModuleId, AlbumName = PhotoGallery.AlbumName });
                 }
             }
         }
@@ -65,16 +65,16 @@ namespace GIBS.Module.PhotoGallery.Manager
         {
            var searchContentList = new List<SearchContent>();
 
-           foreach (var PhotoGallery in _PhotoGalleryRepository.GetPhotoGallerys(pageModule.ModuleId))
+           foreach (var PhotoGallery in _albumRepository.GetAlbums(pageModule.ModuleId))
            {
                if (PhotoGallery.ModifiedOn >= lastIndexedOn)
                {
                    searchContentList.Add(new SearchContent
                    {
                        EntityName = "GIBSPhotoGallery",
-                       EntityId = PhotoGallery.PhotoGalleryId.ToString(),
-                       Title = PhotoGallery.Name,
-                       Body = PhotoGallery.Name,
+                       EntityId = PhotoGallery.AlbumId.ToString(),
+                       Title = PhotoGallery.AlbumName,
+                       Body = PhotoGallery.AlbumName,
                        ContentModifiedBy = PhotoGallery.ModifiedBy,
                        ContentModifiedOn = PhotoGallery.ModifiedOn
                    });

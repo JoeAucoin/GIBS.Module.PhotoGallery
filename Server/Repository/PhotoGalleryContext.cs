@@ -9,7 +9,10 @@ namespace GIBS.Module.PhotoGallery.Repository
 {
     public class PhotoGalleryContext : DBContextBase, ITransientService, IMultiDatabase
     {
-        public virtual DbSet<Models.PhotoGallery> PhotoGallery { get; set; }
+        public virtual DbSet<Models.Album> PhotoGallery { get; set; }
+        public virtual DbSet<Models.Photo> Photos { get; set; }
+        public virtual DbSet<Models.Tags> Tags { get; set; }
+        public virtual DbSet<Models.PhotoTags> PhotoTags { get; set; }
 
         public PhotoGalleryContext(IDBContextDependencies DBContextDependencies) : base(DBContextDependencies)
         {
@@ -20,7 +23,10 @@ namespace GIBS.Module.PhotoGallery.Repository
         {
             base.OnModelCreating(builder);
 
-            builder.Entity<Models.PhotoGallery>().ToTable(ActiveDatabase.RewriteName("GIBSPhotoGallery"));
+            builder.Entity<Models.Album>().ToTable(ActiveDatabase.RewriteName("GIBSPhotoGallery_Album"));
+            builder.Entity<Models.Photo>().ToTable(ActiveDatabase.RewriteName("GIBSPhotoGallery_Photo"));
+            builder.Entity<Models.Tags>().ToTable(ActiveDatabase.RewriteName("GIBSPhotoGallery_Tags"));
+            builder.Entity<Models.PhotoTags>().ToTable(ActiveDatabase.RewriteName("GIBSPhotoGallery_PhotoTags"));
         }
     }
 }

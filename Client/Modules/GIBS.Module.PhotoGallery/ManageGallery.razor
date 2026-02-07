@@ -1,0 +1,815 @@
+﻿@using Microsoft.AspNetCore.Components.Forms
+@using Oqtane.Modules.Controls
+@using Oqtane.Services
+@using Oqtane.Models
+@using Oqtane.Security
+@using GIBS.Module.PhotoGallery.Services
+@using GIBS.Module.PhotoGallery.Models
+@using System.IO
+@using System.Text.Json
+@using System.Threading.Tasks
+
+@namespace GIBS.Module.PhotoGallery
+@inherits ModuleBase
+@inject IAlbumService AlbumService
+@inject IPhotoService PhotoService
+@inject ITagService TagService
+@inject IPhotoTagService PhotoTagService
+@inject NavigationManager NavigationManager
+@inject ISettingService SettingService
+@inject IFileService FileService
+@inject IStringLocalizer<ManageGallery> Localizer
+@inject IJSRuntime JS
+
+<h3>Manage Gallery</h3>
+
+<TabStrip ActiveTab="@_activeTab">
+    <TabPanel Name="Albums" Heading="Albums">
+
+        <Pager Items="@_albums">
+            <Header>
+                <th style="width: 1px;">&nbsp;</th>
+                <th style="width: 1px;">&nbsp;</th>
+                <th>Name</th>
+                <th>Description</th>
+                <th>Sort Order</th>
+                <th>Active</th>
+            </Header>
+            <Row>
+                <td><button class="btn btn-outline-secondary btn-sm" @onclick="() => EditAlbum(context)"><i class="oi oi-pencil"></i></button></td>
+                <td><ActionDialog Header="Delete Album" Message="Are You Sure You Wish To Delete This Album?" Action="Delete" IconName="delete" IconOnly Security="SecurityAccessLevel.Edit" Class="btn btn-danger btn-sm" OnClick="@(async () => await DeleteAlbum(context))" ResourceKey="Delete" Id="@context.AlbumId.ToString()" /></td>
+                <td>@context.AlbumName</td>
+                <td>@context.Description</td>
+                <td>@context.SortOrder</td>
+                <td>@context.IsActive</td>
+            </Row>
+        </Pager>
+        <br />
+        <button class="btn btn-success" @onclick="AddAlbum">Add Album</button>
+
+        @if (_activeAlbum != null)
+        {
+            <form @ref="albumForm" class="@(albumValidated ? " was-validated" : "needs-validation")" novalidate>
+                <div class="container">
+                    <div class="row mb-1 align-items-center">
+                        <Label Class="col-sm-3" For="name" HelpText="Enter the album name" ResourceKey="AlbumName">Name: </Label>
+                        <div class="col-sm-9">
+                            <input id="name" @bind="_activeAlbum.AlbumName" class="form-control" required />
+                        </div>
+                    </div>
+                    <div class="row mb-1 align-items-center">
+                        <Label Class="col-sm-3" For="description" HelpText="Enter a description for the album" ResourceKey="Description">Description: </Label>
+                        <div class="col-sm-9">
+                            <textarea id="description" @bind="_activeAlbum.Description" class="form-control"></textarea>
+                        </div>
+                    </div>
+                    <div class="row mb-1 align-items-center">
+                        <Label Class="col-sm-3" For="sortorder" HelpText="Enter a sort order for the album" ResourceKey="SortOrder">Sort Order: </Label>
+                        <div class="col-sm-9">
+                            <input id="sortorder" type="number" @bind="_activeAlbum.SortOrder" class="form-control" required />
+                        </div>
+                    </div>
+                    <div class="row mb-1 align-items-center">
+                        <Label Class="col-sm-3" For="isactive" HelpText="Is this album active?" ResourceKey="IsActive">Is Active: </Label>
+                        <div class="col-sm-9">
+                            <input id="isactive" type="checkbox" @bind="_activeAlbum.IsActive" class="form-check-input" />
+                        </div>
+                    </div>
+                    <div class="row mb-1 align-items-center">
+                        <Label Class="col-sm-3" For="parent" HelpText="Select a parent album" ResourceKey="ParentAlbumId">Parent Album: </Label>
+                        <div class="col-sm-9">
+                            <select id="parent" @bind="_activeAlbum.ParentAlbumId" class="form-control">
+                                <option value=""></option>
+                                @if (_albums != null)
+                                {
+                                    @foreach (var album in _albums.Where(a => a.AlbumId != _activeAlbum.AlbumId))
+                                    {
+                                        <option value="@album.AlbumId">@album.AlbumName</option>
+                                    }
+                                }
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                @if (_activeAlbum.AlbumId != 0)
+                {
+                    <br />
+                    <AuditInfo CreatedBy="@_activeAlbum.CreatedBy" CreatedOn="@_activeAlbum.CreatedOn" ModifiedBy="@_activeAlbum.ModifiedBy" ModifiedOn="@_activeAlbum.ModifiedOn"></AuditInfo>
+                }
+                <button class="btn btn-success" type="button" @onclick="SaveAlbum">Save</button>
+                <button class="btn btn-secondary" type="button" @onclick="CancelAlbum">Cancel</button>
+            </form>
+        }
+
+    </TabPanel>
+    <TabPanel Name="Photos">
+        <h3>Manage Photos</h3>
+        @if (_activePhoto == null)
+        {
+            <div class="text-end">
+                <button class="btn btn-success mb-2" @onclick="AddPhoto">Add Photo</button>
+            </div>
+        }
+
+        @if (_activePhoto != null)
+        {
+            <form @ref="photoForm" class="@(photoValidated ? " was-validated" : "needs-validation")" novalidate>
+                <div class="container">
+                    <div class="row mb-1 align-items-center">
+                        <Label Class="col-sm-3" For="item-album" HelpText="Select an album for the photo">Album: </Label>
+                        <div class="col-sm-9">
+                            <select id="item-album" @bind="SelectedPhotoAlbumId" class="form-control" required>
+                                <option value=""></option>
+                                @if (_albums != null)
+                                {
+                                    @foreach (var album in _albums)
+                                    {
+                                        <option value="@album.AlbumId">@album.AlbumName</option>
+                                    }
+                                }
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row mb-1 align-items-center">
+                        <Label Class="col-sm-3" For="item-title" HelpText="Enter the photo title">Title: </Label>
+                        <div class="col-sm-9">
+                            <input id="item-title" @bind="_activePhoto.Title" class="form-control" required />
+                        </div>
+                    </div>
+                    <div class="row mb-1 align-items-center">
+                        <Label Class="col-sm-3" For="item-description" HelpText="Enter a description for the photo">Description: </Label>
+                        <div class="col-sm-9">
+                            <textarea id="item-description" @bind="_activePhoto.Description" class="form-control"></textarea>
+                        </div>
+                    </div>
+
+                    <div class="row mb-1 align-items-center">
+                        <Label Class="col-sm-3" For="item-tags" HelpText="Enter a comma-separated list of tags">Tags: </Label>
+                        <div class="col-sm-9">
+                            <div style="position: relative;">
+                                <input id="item-tags" value="@_activePhoto.Tags" @oninput="OnTagInput" class="form-control" autocomplete="off" />
+                                @if (_tagSuggestions != null && _tagSuggestions.Any())
+                                {
+                                    <ul class="list-group" style="position: absolute; z-index: 1000; width: 100%;">
+                                        @foreach (var suggestion in _tagSuggestions)
+                                        {
+                                            <li class="list-group-item list-group-item-action" style="cursor: pointer;" @onclick="() => SelectTagSuggestion(suggestion)">
+                                                @suggestion
+                                            </li>
+                                        }
+                                    </ul>
+                                }
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row mb-1 align-items-center">
+                        <Label Class="col-sm-3" For="item-mediatype" HelpText="Enter the media type (e.g., image, video)">Media Type: </Label>
+                        <div class="col-sm-9">
+                            <input id="item-mediatype" @bind="_activePhoto.MediaType" class="form-control" required />
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <Label Class="col-sm-3" For="upload">File:</Label>
+                        <div class="col-sm-9">
+                            <FileManager UploadMultiple="false" Filter="jpg,png,gif,jpeg,pdf"
+                                         FolderId="@_folderId"
+                                         ShowSuccess="true" ShowFolders="false" ShowFiles="false" ShowImage="false"
+                                         OnUpload="@HandleFileUpload" />
+                        </div>
+                    </div>
+
+                    <div class="row mb-1 align-items-center">
+                        <Label Class="col-sm-3" For="item-filepath" HelpText="Enter the relative path to the file">File Path: </Label>
+                        <div class="col-sm-9">
+                            <input id="item-filepath" @bind="_activePhoto.FilePath" class="form-control" required />
+                            @if (!string.IsNullOrEmpty(_activePhoto.FilePath))
+                            {
+                                <img src="@_activePhoto.FilePath" alt="Image preview" style="max-width: 280px; max-height: 200px; margin-top: 5px; margin-bottom: 10px;" />
+                            }
+                        </div>
+                    </div>
+                    <div class="row mb-1 align-items-center">
+                        <Label Class="col-sm-3" For="item-thumbnail" HelpText="Enter the relative path to the thumbnail (optional)">Thumbnail Path: </Label>
+                        <div class="col-sm-9">
+                            <input id="item-thumbnail" @bind="_activePhoto.ThumbnailPath" class="form-control" />
+                        </div>
+                    </div>
+                    <div class="row mb-1 align-items-center">
+                        <Label Class="col-sm-3" For="item-sortorder" HelpText="Enter a sort order for the photo">Sort Order: </Label>
+                        <div class="col-sm-9">
+                            <input id="item-sortorder" type="number" @bind="_activePhoto.SortOrder" class="form-control" />
+                        </div>
+                    </div>
+                    <div class="row mb-1 align-items-center">
+                        <Label Class="col-sm-3" For="item-isactive" HelpText="Is this photo active?">Is Active: </Label>
+                        <div class="col-sm-9">
+                            <input id="item-isactive" type="checkbox" @bind="_activePhoto.IsActive" class="form-check-input" />
+                        </div>
+                    </div>
+                </div>
+                @if (_activePhoto.PhotoId != 0)
+                {
+                    <br />
+                    <AuditInfo CreatedBy="@_activePhoto.CreatedBy" CreatedOn="@_activePhoto.CreatedOn" ModifiedBy="@_activePhoto.ModifiedBy" ModifiedOn="@_activePhoto.ModifiedOn"></AuditInfo>
+                }
+                <button class="btn btn-success" type="button" @onclick="SavePhoto">Save Photo</button>
+                <button class="btn btn-secondary" type="button" @onclick="CancelPhoto">Cancel</button>
+                <hr />
+            </form>
+        }
+
+        @if (_photos == null)
+        {
+            <p><em>Loading...</em></p>
+        }
+        else
+        {
+            <div class="row mb-3">
+                <div class="col-md-2 offset-md-3">
+                    <select id="statusFilter" class="form-select" @bind="SelectedAlbum">
+                        <option value="">All Albums</option>
+                        @if (_albums != null)
+                        {
+                            @foreach (var album in _albums)
+                            {
+                                <option value="@album.AlbumId">@album.AlbumName</option>
+                            }
+                        }
+                    </select>
+                </div>
+
+                <div class="col-md-3 align-self-end">
+                    <button class="btn btn-secondary" @onclick="ClearFilters">Clear Filter</button>
+                    @if (FiltersActive)
+                    {
+                        <span class="badge bg-warning text-dark ms-2">Filter Applied</span>
+                    }
+                </div>
+            </div>
+            <hr />
+
+            <Pager Items="@_photos.OrderBy(i => i.AlbumName).ThenBy(i => i.SortOrder)" SearchProperties="Title">
+                <Header>
+                    <th style="width: 1px;">&nbsp;</th>
+                    <th style="width: 1px;">&nbsp;</th>
+                    <th style="width: 1px;">Photo</th>
+                    <th>Title</th>
+                    <th>Media Type</th>
+                    <th>Album</th>
+                    <th>Sort Order</th>
+                    <th>Active</th>
+                </Header>
+                <Row>
+                    <td><button class="btn btn-outline-secondary btn-sm" @onclick="() => EditPhoto(context)"><i class="oi oi-pencil"></i></button></td>
+                    <td><ActionDialog Header="Delete Photo" Message="Are You Sure You Wish To Delete This Photo?" Action="Delete" IconName="delete" IconOnly Security="SecurityAccessLevel.Edit" Class="btn btn-danger btn-sm" OnClick="@(async () => await DeletePhoto(context))" ResourceKey="Delete" Id="@context.PhotoId.ToString()" /></td>
+                    <td class="text-center">
+                        @if (!string.IsNullOrEmpty(context.FilePath))
+                        {
+                            <img src="@context.ThumbnailPath" alt="@context.Title" class="img-thumbnail" style="max-width: 120px; max-height: 100px; object-fit: cover;" />
+                        }
+                    </td>
+                    <td>@context.Title</td>
+                    <td>@context.MediaType</td>
+                    <td>@context.AlbumName</td>
+                    <td>@context.SortOrder</td>
+                    <td>@context.IsActive</td>
+                </Row>
+            </Pager>
+        }
+    </TabPanel>
+    <TabPanel Name="BulkUpload" Heading="Bulk Upload">
+        <h2>Coming </h2>
+    </TabPanel>
+</TabStrip>
+
+@code {
+    public override SecurityAccessLevel SecurityAccessLevel => SecurityAccessLevel.Edit;
+    public override bool UseAdminContainer => false;
+
+    private List<Album> _albums;
+    private List<Photo> _photos;
+    private List<Tags> _tags;
+    private List<PhotoTags> _photoTags;
+    private Album _activeAlbum;
+    private Photo _activePhoto;
+    private string _activeTab = "Albums";
+    private int _folderId = 1;
+    private int _selectedAlbum = 0;
+    private int _imageThumbWidth;
+    private int _imageThumbHeight;
+    private int _imageMaxWidth;
+    private int _imageMaxHeight;
+    private ElementReference photoForm;
+    private bool photoValidated;
+    private ElementReference albumForm;
+    private bool albumValidated;
+
+    private class FilterState
+    {
+        public int SelectedAlbum { get; set; }
+    }
+
+    private string _storageKey => $"GIBS_PhotoGallery_ManageGallery_{ModuleState.ModuleId}_FilterState";
+    private bool FiltersActive => _selectedAlbum != 0;
+
+    private int SelectedAlbum
+    {
+        get => _selectedAlbum;
+        set
+        {
+            _selectedAlbum = value;
+            ApplyFilters();
+        }
+    }
+
+    private int? SelectedPhotoAlbumId
+    {
+        get => _activePhoto?.AlbumId;
+        set
+        {
+            if (_activePhoto == null)
+            {
+                return;
+            }
+
+            _activePhoto.AlbumId = value;
+            UpdatePhotoSortOrder();
+        }
+    }
+
+    public override List<Resource> Resources => new List<Resource>()
+    {
+        new Resource { ResourceType = ResourceType.Stylesheet, Url = ModulePath() + "Module.css?v=1.2" }
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var settings = await SettingService.GetModuleSettingsAsync(ModuleState.ModuleId);
+            _folderId = int.Parse(SettingService.GetSetting(settings, "FileFolderId", "1"));
+            _imageThumbWidth = int.Parse(SettingService.GetSetting(settings, "ImageThumbWidth", "360"));
+            _imageThumbHeight = int.Parse(SettingService.GetSetting(settings, "ImageThumbHeight", "360"));
+            if (!int.TryParse(SettingService.GetSetting(ModuleState.Settings, "ImageMaxWidth", "1600"), out _imageMaxWidth))
+            {
+                _imageMaxWidth = 1600;
+            }
+            if (!int.TryParse(SettingService.GetSetting(ModuleState.Settings, "ImageMaxHeight", "900"), out _imageMaxHeight))
+            {
+                _imageMaxHeight = 900;
+            }
+
+            await LoadAlbums();
+            await LoadPhotos();
+            await LoadTags();
+        }
+        catch (Exception ex)
+        {
+            await logger.LogError(ex, "Error Loading Albums {Error}", ex.Message);
+        }
+    }
+
+    private async Task LoadTags()
+    {
+        _tags = await TagService.GetTagsAsync(ModuleState.ModuleId);
+    }
+
+    private async Task SaveFiltersAsync()
+    {
+        try
+        {
+            var filterState = new FilterState
+            {
+                SelectedAlbum = SelectedAlbum
+            };
+
+            var json = JsonSerializer.Serialize(filterState);
+            await JS.InvokeVoidAsync("localStorage.setItem", _storageKey, json);
+        }
+        catch (Exception ex)
+        {
+            await logger.LogError(ex, "Error Saving Filter State");
+        }
+    }
+
+    private void ApplyFilters()
+    {
+        IEnumerable<Photo> query = _photos;
+
+        if (_selectedAlbum > 0)
+        {
+            query = query.Where(r => r.AlbumId == _selectedAlbum);
+        }
+
+        _photos = query.ToList();
+        _ = SaveFiltersAsync();
+        StateHasChanged();
+    }
+
+    private async Task ClearFilters()
+    {
+        _selectedAlbum = 0;
+        await LoadPhotos();
+    }
+
+    private async Task HandleFileUpload(int fileId)
+    {
+        var uploadedFile = await FileService.GetFileAsync(fileId);
+        if (uploadedFile != null)
+        {
+            if (uploadedFile.ImageWidth > _imageMaxWidth || uploadedFile.ImageHeight > _imageMaxHeight)
+            {
+                var resized = await PhotoService.ResizeImageAsync(uploadedFile.FileId, _imageMaxWidth, _imageMaxHeight, ModuleState.ModuleId);
+                if (resized == null)
+                {
+                    AddModuleMessage("There was an error resizing the image.", MessageType.Error);
+                    return;
+                }
+
+                uploadedFile = await FileService.GetFileAsync(uploadedFile.FileId);
+            }
+
+            _activePhoto.FileId = uploadedFile.FileId;
+            _activePhoto.FilePath = uploadedFile.Url;
+
+            try
+            {
+                string newFileName = $"{uploadedFile.FileId}_{uploadedFile.Name}";
+                newFileName = newFileName.Replace(" ", "_");
+                newFileName = System.Text.RegularExpressions.Regex.Replace(newFileName, @"[^a-zA-Z0-9_\-\.]", "");
+
+                var renamedFile = await RenameFile(fileId, newFileName);
+                if (renamedFile == null)
+                {
+                    return;
+                }
+
+                _activePhoto.FileId = renamedFile.FileId;
+                _activePhoto.FilePath = renamedFile.Url;
+                if (string.IsNullOrWhiteSpace(_activePhoto.Title))
+                {
+                    var title = Path.GetFileNameWithoutExtension(renamedFile.Name);
+                    title = System.Text.RegularExpressions.Regex.Replace(title, @"^[0-9]+_", "").Trim();
+                    _activePhoto.Title = title.Replace("_", " ");
+                }
+                var imageType = Path.GetExtension(renamedFile.Name);
+                imageType = imageType.StartsWith(".") ? imageType[1..] : imageType;
+                _activePhoto.MediaType = imageType.ToUpper();
+
+                var myThumbnail = await PhotoService.CreateImageThumbnailAsync(_activePhoto.FileId, _imageThumbWidth, _imageThumbHeight, ModuleState.ModuleId);
+                _activePhoto.ThumbnailPath = myThumbnail?.Url;
+                AddModuleMessage("File added successfully.", MessageType.Success);
+            }
+            catch (Exception ex)
+            {
+                await logger.LogError(ex, "Error saving file information: {Error}", ex.Message);
+                AddModuleMessage("There was an error saving the file information.", MessageType.Error);
+            }
+        }
+        else
+        {
+            AddModuleMessage("Could not retrieve file details after upload.", MessageType.Error);
+        }
+        StateHasChanged();
+    }
+
+    public async Task<Oqtane.Models.File> RenameFile(int fileId, string newFileName)
+    {
+        try
+        {
+            var uploadedFile = await FileService.GetFileAsync(fileId);
+
+            if (uploadedFile != null)
+            {
+                uploadedFile.Name = newFileName;
+                return await FileService.UpdateFileAsync(uploadedFile);
+            }
+        }
+        catch (Exception ex)
+        {
+            await logger.LogError(ex, "Error renaming file {FileId}: {Error}", fileId, ex.Message);
+        }
+        return null;
+    }
+
+    private async Task LoadAlbums()
+    {
+        _albums = await AlbumService.GetAlbumsAsync(ModuleState.ModuleId);
+    }
+
+    private void AddAlbum()
+    {
+        _activeAlbum = new Album
+        {
+            ModuleId = ModuleState.ModuleId,
+            IsActive = true
+        };
+    }
+
+    private void EditAlbum(Album album)
+    {
+        _activeAlbum = new Album
+        {
+            AlbumId = album.AlbumId,
+            ModuleId = album.ModuleId,
+            AlbumName = album.AlbumName,
+            Description = album.Description,
+            SortOrder = album.SortOrder,
+            IsActive = album.IsActive,
+            ParentAlbumId = album.ParentAlbumId,
+            CreatedBy = album.CreatedBy,
+            CreatedOn = album.CreatedOn,
+            ModifiedBy = album.ModifiedBy,
+            ModifiedOn = album.ModifiedOn
+        };
+    }
+
+    private async Task SaveAlbum()
+    {
+        try
+        {
+            albumValidated = true;
+            var interop = new Oqtane.UI.Interop(JSRuntime);
+            if (!await interop.FormValid(albumForm))
+            {
+                AddModuleMessage(Localizer["Message_SaveValidation"], MessageType.Warning);
+                return;
+            }
+
+            if (_activeAlbum.AlbumId == 0)
+            {
+                await AlbumService.AddAlbumAsync(_activeAlbum);
+                await logger.LogInformation("Album Added {Album}", _activeAlbum);
+            }
+            else
+            {
+                await AlbumService.UpdateAlbumAsync(_activeAlbum);
+                await logger.LogInformation("Album Updated {Album}", _activeAlbum);
+            }
+            await LoadAlbums();
+            _activeAlbum = null;
+            albumValidated = false;
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            await logger.LogError(ex, "Error Saving Album {Error}", ex.Message);
+        }
+    }
+
+    private async Task DeleteAlbum(Album album)
+    {
+        try
+        {
+            await AlbumService.DeleteAlbumAsync(album.AlbumId, album.ModuleId);
+            await logger.LogInformation("Album Deleted {Album}", album);
+            await LoadAlbums();
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            await logger.LogError(ex, "Error Deleting Album {Error}", ex.Message);
+        }
+    }
+
+    private async Task LoadPhotos()
+    {
+        _photos = await PhotoService.GetPhotosAsync(ModuleState.ModuleId);
+        await LoadTags();
+        if (_albums != null)
+        {
+            foreach (var photo in _photos)
+            {
+                if (photo.AlbumId.HasValue)
+                {
+                    photo.AlbumName = _albums.FirstOrDefault(a => a.AlbumId == photo.AlbumId.Value)?.AlbumName;
+                }
+
+                var photoTags = await PhotoTagService.GetPhotoTagsAsync(photo.PhotoId, ModuleState.ModuleId);
+                if (photoTags != null && photoTags.Any())
+                {
+                    var tagNames = new List<string>();
+                    foreach (var photoTag in photoTags)
+                    {
+                        var tag = _tags.FirstOrDefault(t => t.TagId == photoTag.TagId);
+                        if (tag != null)
+                        {
+                            tagNames.Add(tag.TagName);
+                        }
+                    }
+                    photo.Tags = string.Join(", ", tagNames);
+                }
+            }
+        }
+    }
+
+    private async Task DeletePhoto(Photo photo)
+    {
+        try
+        {
+            await PhotoService.DeletePhotoAsync(photo.PhotoId, photo.ModuleId);
+            await logger.LogInformation("Photo Deleted {Photo}", photo);
+            await LoadPhotos();
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            await logger.LogError(ex, "Error Deleting Photo {Error}", ex.Message);
+        }
+    }
+
+    private void AddPhoto()
+    {
+        _activePhoto = new Photo
+        {
+            ModuleId = ModuleState.ModuleId,
+            IsActive = true,
+            MediaType = "Image"
+        };
+        if (SelectedAlbum > 0)
+        {
+            _activePhoto.AlbumId = SelectedAlbum;
+        }
+        UpdatePhotoSortOrder();
+    }
+
+    private void UpdatePhotoSortOrder()
+    {
+        if (_activePhoto == null)
+        {
+            return;
+        }
+
+        var activeAlbumId = _activePhoto.AlbumId ?? 0;
+        _activePhoto.SortOrder = (_photos != null && _photos.Any(i => i.AlbumId == activeAlbumId))
+            ? _photos.Where(i => i.AlbumId == activeAlbumId).Max(i => i.SortOrder) + 10
+            : 10;
+    }
+
+    private void EditPhoto(Photo photo)
+    {
+        _activePhoto = new Photo
+        {
+            PhotoId = photo.PhotoId,
+            ModuleId = photo.ModuleId,
+            AlbumId = photo.AlbumId,
+            Title = photo.Title,
+            Description = photo.Description,
+            MediaType = photo.MediaType,
+            FileId = photo.FileId,
+            FilePath = photo.FilePath,
+            ThumbnailFileId = photo.ThumbnailFileId,
+            ThumbnailPath = photo.ThumbnailPath,
+            SortOrder = photo.SortOrder,
+            IsActive = photo.IsActive,
+            ViewCount = photo.ViewCount,
+            Tags = photo.Tags,
+            CreatedBy = photo.CreatedBy,
+            CreatedOn = photo.CreatedOn,
+            ModifiedBy = photo.ModifiedBy,
+            ModifiedOn = photo.ModifiedOn
+        };
+    }
+
+    private async Task SavePhoto()
+    {
+        try
+        {
+            photoValidated = true;
+            var interop = new Oqtane.UI.Interop(JSRuntime);
+            if (!await interop.FormValid(photoForm))
+            {
+                AddModuleMessage(Localizer["Message_SaveValidation"], MessageType.Warning);
+                return;
+            }
+
+            _activePhoto.Tags = _activePhoto.Tags?.Trim().TrimEnd(',');
+
+            if (_activePhoto.PhotoId == 0)
+            {
+                var newPhoto = await PhotoService.AddPhotoAsync(_activePhoto);
+                await logger.LogInformation("Photo Added {Photo}", newPhoto);
+                _activePhoto.PhotoId = newPhoto.PhotoId;
+            }
+            else
+            {
+                await PhotoService.UpdatePhotoAsync(_activePhoto);
+                await logger.LogInformation("Photo Updated {Photo}", _activePhoto);
+            }
+
+            await ProcessTags();
+
+            await LoadPhotos();
+            ApplyFilters();
+            _activePhoto = null;
+            photoValidated = false;
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            await logger.LogError(ex, "Error Saving Photo {Error}", ex.Message);
+        }
+    }
+
+    private List<string> _tagSuggestions = new List<string>();
+
+    private void OnTagInput(ChangeEventArgs e)
+    {
+        _activePhoto.Tags = e.Value?.ToString();
+
+        var tagsParts = _activePhoto.Tags.Split(new[] { ',' }, StringSplitOptions.None);
+        var currentTag = tagsParts.Last().Trim();
+
+        if (currentTag.Length >= 3)
+        {
+            var existingTags = tagsParts.Take(tagsParts.Length - 1).Select(t => t.Trim()).Where(t => !string.IsNullOrEmpty(t)).ToList();
+
+            _tagSuggestions = _tags.Select(t => t.TagName)
+                                   .Where(t => t.StartsWith(currentTag, StringComparison.OrdinalIgnoreCase) && !existingTags.Contains(t, StringComparer.OrdinalIgnoreCase))
+                                   .ToList();
+        }
+        else
+        {
+            _tagSuggestions.Clear();
+        }
+    }
+
+    private void SelectTagSuggestion(string suggestion)
+    {
+        var lastCommaIndex = _activePhoto.Tags.LastIndexOf(',');
+        string baseTags = "";
+        if (lastCommaIndex != -1)
+        {
+            baseTags = _activePhoto.Tags.Substring(0, lastCommaIndex + 1);
+        }
+
+        _activePhoto.Tags = (baseTags + " " + suggestion).Trim() + ", ";
+        _tagSuggestions.Clear();
+    }
+
+    private async Task ProcessTags()
+    {
+        if (_activePhoto.Tags != null)
+        {
+            var currentPhotoTags = await PhotoTagService.GetPhotoTagsAsync(_activePhoto.PhotoId, ModuleState.ModuleId);
+            var currentTagNames = new List<string>();
+            if (currentPhotoTags != null)
+            {
+                await LoadTags();
+                foreach (var photoTag in currentPhotoTags)
+                {
+                    var tag = _tags.FirstOrDefault(t => t.TagId == photoTag.TagId);
+                    if (tag != null)
+                    {
+                        currentTagNames.Add(tag.TagName);
+                    }
+                }
+            }
+
+            var newTagNames = _activePhoto.Tags.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(t => t.Trim()).ToList();
+
+            var tagsToAdd = newTagNames.Except(currentTagNames).ToList();
+            foreach (var tagName in tagsToAdd)
+            {
+                var existingTag = _tags?.FirstOrDefault(t => t.TagName.Equals(tagName, StringComparison.OrdinalIgnoreCase));
+                if (existingTag == null)
+                {
+                    var newTag = new Tags { ModuleId = ModuleState.ModuleId, TagName = tagName };
+                    existingTag = await TagService.AddTagAsync(newTag);
+                    await LoadTags();
+                }
+
+                var newPhotoTag = new PhotoTags { PhotoId = _activePhoto.PhotoId, TagId = existingTag.TagId };
+                await PhotoTagService.AddPhotoTagAsync(newPhotoTag, ModuleState.ModuleId);
+            }
+
+            var tagsToRemove = currentTagNames.Except(newTagNames).ToList();
+            foreach (var tagName in tagsToRemove)
+            {
+                var tag = _tags.FirstOrDefault(t => t.TagName.Equals(tagName, StringComparison.OrdinalIgnoreCase));
+                if (tag != null)
+                {
+                    var photoTagToRemove = currentPhotoTags.FirstOrDefault(it => it.TagId == tag.TagId);
+                    if (photoTagToRemove != null)
+                    {
+                        await PhotoTagService.DeletePhotoTagAsync(photoTagToRemove.PhotoTagId, ModuleState.ModuleId);
+                    }
+                }
+            }
+        }
+    }
+
+    private void CancelPhoto()
+    {
+        _activePhoto = null;
+        photoValidated = false;
+    }
+
+    private void CancelAlbum()
+    {
+        _activeAlbum = null;
+        albumValidated = false;
+    }
+}
