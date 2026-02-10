@@ -2,6 +2,7 @@
 @using GIBS.Module.PhotoGallery.Models
 @using System.Text.Json
 @using Microsoft.AspNetCore.Components
+@using System.Net
 
 @namespace GIBS.Module.PhotoGallery
 @inherits ModuleBase
@@ -65,12 +66,16 @@ else
                     @_selectedAlbumName
                     @if (_items != null && _items.Count > 0)
                     {
-                        <a class="ms-3" href="@BuildPhotoUrl(_items.First().PhotoId)" title="Slideshow">
-                            <i class="oi oi-play-circle" style="font-size: 1.75rem;"></i>
-                        </a>
-                        <a class="ms-3" href="@BuildLightboxUrl(_items.First().PhotoId)" title="Lightbox">
-                            <i class="oi oi-zoom-in" style="font-size: 1.75rem;"></i>
-                        </a>
+                        var firstItem = _items.FirstOrDefault();
+                        if (firstItem != null)
+                        {
+                            <a class="ms-3" href="@BuildPhotoUrl(firstItem.PhotoId)" title="Slideshow">
+                                <i class="oi oi-play-circle" style="font-size: 1.75rem;"></i>
+                            </a>
+                            <a class="ms-3" href="@BuildLightboxUrl(firstItem.PhotoId)" title="Lightbox">
+                                <i class="oi oi-zoom-in" style="font-size: 1.75rem;"></i>
+                            </a>
+                        }
                     }
                 </h3>
             </div>
@@ -136,7 +141,13 @@ else
             var current = _items.FirstOrDefault(i => i.PhotoId == _slideshowPhotoId.Value);
             var currentIndex = current != null ? _items.FindIndex(i => i.PhotoId == current.PhotoId) : -1;
             <div class="text-center mb-3">
-                <div class="d-flex align-items-center justify-content-between">
+                <div class="pw-slideshow-content">
+                    @if (current != null)
+                    {
+                        <img src="@current.FilePath" alt="@current.Title" title="@BuildPhotoTitle(current)" />
+                    }
+                </div>
+                <div class="d-flex align-items-center justify-content-between mt-3">
                     <div class="pw-slideshow-nav">
                         @if (currentIndex > 0)
                         {
@@ -145,16 +156,19 @@ else
                             </a>
                         }
                     </div>
-                    <div class="flex-grow-1">
+                    <div class="text-center">
                         @if (current != null)
                         {
-                            <img src="@current.FilePath" alt="@current.Title" class="border rounded" title="@BuildPhotoTitle(current)" style="max-width: 1000px; max-height: 760px; width: auto; height: auto;" />
                             <h3 class="pw-slideshow-title">@current.Title</h3>
                             @if (!string.IsNullOrEmpty(current.Description))
                             {
                                 <div class="pw-slideshow-desc">@current.Description</div>
                             }
+                            <div class="pw-slideshow-counter">@(currentIndex + 1) / @_items.Count</div>
                         }
+                        <div class="mt-3">
+                            <a class="btn btn-secondary" href="@BuildAlbumUrl(_albumId)">Back to Album</a>
+                        </div>
                     </div>
                     <div class="pw-slideshow-nav">
                         @if (currentIndex >= 0 && currentIndex < _items.Count - 1)
@@ -164,9 +178,6 @@ else
                             </a>
                         }
                     </div>
-                </div>
-                <div class="mt-3">
-                    <a class="btn btn-secondary" href="@BuildAlbumUrl(_albumId)">Back to Album</a>
                 </div>
             </div>
         }
@@ -204,39 +215,42 @@ else
 
 @if (_showLightbox)
 {
+    var selectedIndex = _items?.IndexOf(_selectedItem) ?? -1;
     <div class="pw-lightbox-overlay">
         <div class="pw-lightbox-container">
             <a class="pw-lightbox-close" href="@BuildAlbumUrl(_albumId)">&times;</a>
-
-            @if (_items.IndexOf(_selectedItem) > 0)
-            {
-                <div class="pw-lightbox-nav pw-lightbox-nav-prev">
-                    <a class="pw-lightbox-prev" href="@BuildLightboxUrl(_items[_items.IndexOf(_selectedItem) - 1].PhotoId)">
-                        <i class="oi oi-arrow-circle-left" style="font-size: 24px;"></i>
-                    </a>
-                </div>
-            }
 
             <div class="pw-lightbox-content">
                 <img src="@_selectedItem.FilePath" alt="@_selectedItem.Title" title="@BuildPhotoTitle(_selectedItem)" />
             </div>
 
-            @if (_items.IndexOf(_selectedItem) < _items.Count - 1)
-            {
-                <div class="pw-lightbox-nav pw-lightbox-nav-next">
-                    <a class="pw-lightbox-next" href="@BuildLightboxUrl(_items[_items.IndexOf(_selectedItem) + 1].PhotoId)">
-                        <i class="oi oi-arrow-circle-right" style="font-size: 24px;"></i>
-                    </a>
-                </div>
-            }
-
             <div class="pw-lightbox-info">
-                <h3 class="pw-lightbox-title mt-1">@_selectedItem.Title</h3>
-                @if (!string.IsNullOrEmpty(_selectedItem.Description))
-                {
-                    <div class="pw-lightbox-description">@_selectedItem.Description</div>
-                }
-                <span class="pw-lightbox-counter">@(_items.IndexOf(_selectedItem) + 1) / @_items.Count</span>
+                <div class="pw-lightbox-info-nav">
+                    <div class="pw-lightbox-info-prev">
+                        @if (selectedIndex > 0)
+                        {
+                            <a class="pw-lightbox-prev" href="@BuildLightboxUrl(_items[selectedIndex - 1].PhotoId)">
+                                <i class="oi oi-arrow-circle-left" style="font-size: 24px;"></i>
+                            </a>
+                        }
+                    </div>
+                    <div class="pw-lightbox-info-center">
+                        <h2 class="pw-lightbox-title mt-1">@_selectedItem.Title</h2>
+                        @if (!string.IsNullOrEmpty(_selectedItem.Description))
+                        {
+                            <div class="pw-lightbox-description">@_selectedItem.Description</div>
+                        }
+                        <span class="pw-lightbox-counter">@(selectedIndex + 1) / @_items.Count</span>
+                    </div>
+                    <div class="pw-lightbox-info-next">
+                        @if (selectedIndex >= 0 && selectedIndex < _items.Count - 1)
+                        {
+                            <a class="pw-lightbox-next" href="@BuildLightboxUrl(_items[selectedIndex + 1].PhotoId)">
+                                <i class="oi oi-arrow-circle-right" style="font-size: 24px;"></i>
+                            </a>
+                        }
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -247,7 +261,7 @@ else
 
     public override List<Resource> Resources => new List<Resource>()
     {
-        new Resource { ResourceType = ResourceType.Stylesheet, Url = ModulePath() + "Module.css?v=1.1" }
+        new Resource { ResourceType = ResourceType.Stylesheet, Url = ModulePath() + "Module.css?v=1.7" }
     };
 
     private List<PhotoAlbum> _albums;
@@ -283,21 +297,17 @@ else
                     if (PageState.QueryString.ContainsKey("lightbox"))
                     {
                         _showLightbox = true;
-                        _selectedItem = _items?.FirstOrDefault(i => i.PhotoId == photoId);
-                        if (_selectedItem != null)
-                        {
-                            SetPageTitle($"{_selectedItem.Title} - {_selectedAlbumName}");
-                        }
                     }
                     else
                     {
                         _slideshowPhotoId = photoId;
                     }
+
                     _selectedItem = _items?.FirstOrDefault(i => i.PhotoId == photoId);
                     if (_selectedItem != null)
                     {
                         SetPageTitle($"{_selectedItem.Title} - {_selectedAlbumName}");
-
+                        UpdatePhotoOpenGraphMetadata(_selectedItem);
                     }
                 }
 
@@ -373,6 +383,22 @@ else
         var topLevelAlbumIds = albumEntities.Where(a => a.ParentAlbumId == null).Select(a => a.AlbumId).ToHashSet();
         _albums = _albums.Where(a => topLevelAlbumIds.Contains(a.AlbumId)).ToList();
         _subAlbums = null;
+        var firstAlbum = _albums.FirstOrDefault();
+        if (firstAlbum != null)
+        {
+            var ogName = WebUtility.HtmlEncode(firstAlbum.AlbumName);
+            var imageUrl = firstAlbum.FilePath ?? firstAlbum.ThumbnailPath;
+            var baseUrl = PageState.Alias.Protocol + PageState.Alias.Name;
+            var ogImage = WebUtility.HtmlEncode(baseUrl + imageUrl);
+            var ogDescription = WebUtility.HtmlEncode(firstAlbum.Description);
+            var pageUrl = WebUtility.HtmlEncode(baseUrl + NavigateUrl());
+
+            AddHeadContent($"<meta property=\"og:title\" content=\"{ogName} - {Localizer["PhotoGallery"]}\" />");
+            AddHeadContent($"<meta property=\"og:description\" content=\"{ogDescription}\" />");
+            AddHeadContent($"<meta property=\"og:image\" content=\"{ogImage}\" />");
+            AddHeadContent($"<meta property=\"og:url\" content=\"{pageUrl}\" />");
+            AddHeadContent("<meta property=\"og:type\" content=\"website\" />");
+        }
     }
 
     private async Task LoadTags()
@@ -390,9 +416,12 @@ else
         if (_albumItems.Any())
         {
             var selectedAlbum = albumEntities.FirstOrDefault(a => a.AlbumId == _albumId);
+            var albumDisplayName = BuildAlbumDisplayName(selectedAlbum);
 
-            _selectedAlbumName = BuildAlbumDisplayName(selectedAlbum);  // selectedAlbum?.AlbumName ?? "Album";
-            SetPageTitle(BuildAlbumDisplayName(selectedAlbum));
+            _selectedAlbumName = albumDisplayName;
+            SetPageTitle(albumDisplayName);
+
+            UpdatePhotoOpenGraphMetadata(_albumItems.FirstOrDefault());
             await LoadTags();
             if (_tags != null)
             {
@@ -470,6 +499,27 @@ else
             .ToList();
     }
 
+    private void UpdatePhotoOpenGraphMetadata(Photo photo)
+    {
+        if (photo == null)
+        {
+            return;
+        }
+
+        var ogName = WebUtility.HtmlEncode(photo.Title);
+        var imageUrl = photo.FilePath ?? photo.ThumbnailPath;
+        var baseUrl = PageState.Alias.Protocol + PageState.Alias.Name;
+        var ogImage = WebUtility.HtmlEncode(baseUrl + imageUrl);
+        var ogDescription = WebUtility.HtmlEncode(photo.Description ?? photo.Title);
+        var pageUrl = WebUtility.HtmlEncode(baseUrl + NavigateUrl() + $"?album={_albumId}&photo={photo.PhotoId}");
+
+        AddHeadContent($"<meta property=\"og:title\" content=\"{ogName}\" />");
+        AddHeadContent($"<meta property=\"og:description\" content=\"{ogDescription}\" />");
+        AddHeadContent($"<meta property=\"og:image\" content=\"{ogImage}\" />");
+        AddHeadContent($"<meta property=\"og:url\" content=\"{pageUrl}\" />");
+        AddHeadContent("<meta property=\"og:type\" content=\"website\" />");
+    }
+
     private async Task FilterByTag(string tagName)
     {
         if (_selectedTag == tagName)
@@ -543,6 +593,7 @@ else
         {
             _selectedItem = _items[currentIndex + 1];
             SetPageTitle($"{_selectedItem.Title} - {_selectedAlbumName}");
+            UpdatePhotoOpenGraphMetadata(_selectedItem);
             StateHasChanged();
         }
     }
@@ -554,6 +605,7 @@ else
         {
             _selectedItem = _items[currentIndex - 1];
             SetPageTitle($"{_selectedItem.Title} - {_selectedAlbumName}");
+            UpdatePhotoOpenGraphMetadata(_selectedItem);
             StateHasChanged();
         }
     }

@@ -10,7 +10,9 @@ namespace GIBS.Module.PhotoGallery.Models
     {
         public int AlbumId { get; set; }
         public string AlbumName { get; set; }
+        public string FilePath { get; set; } 
         public string ThumbnailPath { get; set; }
+        public string Description { get; set; }
         public int ItemCount { get; set; }
     }
 }

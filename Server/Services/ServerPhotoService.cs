@@ -51,11 +51,14 @@ namespace GIBS.Module.PhotoGallery.Services
                             .ToList();
 
                         var thumbnailPath = albumPhotos.FirstOrDefault()?.ThumbnailPath ?? albumPhotos.FirstOrDefault()?.FilePath;
+                        var filePath = albumPhotos.FirstOrDefault()?.FilePath ?? albumPhotos.FirstOrDefault()?.ThumbnailPath;
 
                         return new PhotoAlbum
                         {
                             AlbumId = album.AlbumId,
                             AlbumName = album.AlbumName,
+                            Description = album.Description,
+                            FilePath = filePath,
                             ThumbnailPath = thumbnailPath,
                             ItemCount = albumPhotos.Count
                         };

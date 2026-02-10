@@ -404,6 +404,24 @@
     max-height: calc(100% - 120px);
 }
 
+.pw-slideshow-content {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    max-width: 100%;
+    max-height: 760px;
+}
+
+.pw-slideshow-content img {
+    display: block;
+    width: 100%;
+    height: auto;
+    max-width: 1000px;
+    max-height: 760px;
+    object-fit: contain;
+}
+
     .pw-lightbox-content img,
     .pw-lightbox-content video {
         max-width: 100%;
@@ -525,6 +543,27 @@
     background: linear-gradient(to top, rgba(0,0,0,0.8), transparent);
     padding: 40px 20px 20px;
     text-align: center;
+}
+
+.pw-lightbox-info-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+.pw-lightbox-info-center {
+    flex: 1;
+    text-align: center;
+}
+
+.pw-lightbox-info-prev,
+.pw-lightbox-info-next {
+    width: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .pw-lightbox-title {

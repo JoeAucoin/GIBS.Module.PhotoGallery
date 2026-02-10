@@ -21,7 +21,7 @@
 @inject IStringLocalizer<ManageGallery> Localizer
 @inject IJSRuntime JS
 
-<h3>Manage Gallery</h3>
+<h2 class="mb-3">Manage Gallery</h2>
 
 <TabStrip ActiveTab="@_activeTab">
     <TabPanel Name="Albums" Heading="Albums">
@@ -103,7 +103,7 @@
 
     </TabPanel>
     <TabPanel Name="Photos">
-        <h3>Manage Photos</h3>
+        
         @if (_activePhoto == null)
         {
             <div class="text-end">
@@ -113,6 +113,15 @@
 
         @if (_activePhoto != null)
         {
+            if (_activePhoto.PhotoId != 0)
+            {     
+                 <h3 class="mb-3">Edit Photo Details</h3>   
+            }
+            else
+            {
+                 <h3 class="mb-3">Add New Photo</h3>   
+            }
+           
             <form @ref="photoForm" class="@(photoValidated ? " was-validated" : "needs-validation")" novalidate>
                 <div class="container">
                     <div class="row mb-1 align-items-center">
@@ -214,7 +223,7 @@
                     <br />
                     <AuditInfo CreatedBy="@_activePhoto.CreatedBy" CreatedOn="@_activePhoto.CreatedOn" ModifiedBy="@_activePhoto.ModifiedBy" ModifiedOn="@_activePhoto.ModifiedOn"></AuditInfo>
                 }
-                <button class="btn btn-success" type="button" @onclick="SavePhoto">Save Photo</button>
+                <button class="btn btn-success" type="button" @onclick="SavePhoto">Save</button> <button class="btn btn-success" type="button" @onclick="SaveAndAddNew">Save and Add New</button>
                 <button class="btn btn-secondary" type="button" @onclick="CancelPhoto">Cancel</button>
                 <hr />
             </form>
@@ -673,6 +682,13 @@
         };
     }
 
+    private async Task SaveAndAddNew()
+    {
+        await SavePhoto();
+        AddPhoto();
+
+    }   
+
     private async Task SavePhoto()
     {
         try
@@ -705,7 +721,7 @@
             ApplyFilters();
             _activePhoto = null;
             photoValidated = false;
-            AddPhoto();
+            
             StateHasChanged();
             
         }
