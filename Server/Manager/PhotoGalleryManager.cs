@@ -13,15 +13,48 @@ using System.Threading.Tasks;
 
 namespace GIBS.Module.PhotoGallery.Manager
 {
-    public class PhotoGalleryManager : MigratableModuleBase, IInstallable, IPortable, ISearchable
+    public class PhotoGalleryManager : MigratableModuleBase, IInstallable, IPortable, ISearchable, ISitemap
     {
         private readonly IAlbumRepository _albumRepository;
+        private readonly IPhotoRepository _photoRepository; // Keep only the underscored version
         private readonly IDBContextDependencies _DBContextDependencies;
 
-        public PhotoGalleryManager(IAlbumRepository albumRepository, IDBContextDependencies DBContextDependencies)
+        public PhotoGalleryManager(IAlbumRepository albumRepository, IPhotoRepository photoRepository, IDBContextDependencies DBContextDependencies)
         {
             _albumRepository = albumRepository;
+            _photoRepository = photoRepository; // Now correctly assigned from parameters
             _DBContextDependencies = DBContextDependencies;
+        }
+
+        public List<Sitemap> GetUrls(string alias, string path, Oqtane.Models.Module module)
+        {
+            var sitemapUrls = new List<Sitemap>();
+            var albums = _albumRepository.GetAlbums(module.ModuleId);
+            var photos = _photoRepository.GetPhotos(module.ModuleId);
+
+            // 1. Fetch your custom module data (e.g., from a repository)
+            // 2. Loop through your items and create Sitemap objects
+            // 3. Example of adding a dynamic detail page:
+
+            foreach (var album in albums)
+            {
+
+                sitemapUrls.Add(new Sitemap
+                {
+                    Url = $"{alias}/{path}?album={album.AlbumId}", // Construct the full URL
+                    ModifiedOn = DateTime.UtcNow
+                });
+            }
+
+            foreach (var photo in photos)
+            {
+                sitemapUrls.Add(new Sitemap
+                {
+                    Url = $"{alias}/{path}?album={photo.AlbumId}&photo={photo.PhotoId}", // Construct the full URL
+                    ModifiedOn = DateTime.UtcNow
+                });
+            }
+            return sitemapUrls;
         }
 
         public bool Install(Tenant tenant, string version)
@@ -83,5 +116,7 @@ namespace GIBS.Module.PhotoGallery.Manager
 
            return Task.FromResult(searchContentList);
         }
+
+
     }
 }
