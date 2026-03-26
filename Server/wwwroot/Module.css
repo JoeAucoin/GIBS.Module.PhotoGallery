@@ -84,7 +84,8 @@
 
 .pw-album-card {
     position: relative;
-    width: 400px !important;
+    width: 32% !important;
+   
     height: 300px;
     border-radius: 4px;
     overflow: hidden;

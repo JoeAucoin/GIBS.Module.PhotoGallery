@@ -142,13 +142,13 @@
                     <div class="row mb-1 align-items-center">
                         <Label Class="col-sm-3" For="item-title" HelpText="Enter the photo title">Title: </Label>
                         <div class="col-sm-9">
-                            <input id="item-title" @bind="_activePhoto.Title" class="form-control" required />
+                            <input id="item-title" @bind="_activePhoto.Title" class="form-control" maxlength="200" required />
                         </div>
                     </div>
                     <div class="row mb-1 align-items-center">
                         <Label Class="col-sm-3" For="item-description" HelpText="Enter a description for the photo">Description: </Label>
                         <div class="col-sm-9">
-                            <textarea id="item-description" @bind="_activePhoto.Description" class="form-control"></textarea>
+                            <textarea id="item-description" @bind="_activePhoto.Description" class="form-control" maxlength="2000"></textarea>
                         </div>
                     </div>
 
@@ -175,7 +175,7 @@
                     <div class="row mb-1 align-items-center">
                         <Label Class="col-sm-3" For="item-mediatype" HelpText="Enter the media type (e.g., image, video)">Media Type: </Label>
                         <div class="col-sm-9">
-                            <input id="item-mediatype" @bind="_activePhoto.MediaType" class="form-control" required />
+                            <input id="item-mediatype" @bind="_activePhoto.MediaType" class="form-control" maxlength="20" required />
                         </div>
                     </div>
 
@@ -192,7 +192,7 @@
                     <div class="row mb-1 align-items-center">
                         <Label Class="col-sm-3" For="item-filepath" HelpText="Enter the relative path to the file">File Path: </Label>
                         <div class="col-sm-9">
-                            <input id="item-filepath" @bind="_activePhoto.FilePath" class="form-control" required />
+                            <input id="item-filepath" @bind="_activePhoto.FilePath" class="form-control" maxlength="500" required />
                             @if (!string.IsNullOrEmpty(_activePhoto.FilePath))
                             {
                                 <img src="@_activePhoto.FilePath" alt="Image preview" style="max-width: 280px; max-height: 200px; margin-top: 5px; margin-bottom: 10px;" />
@@ -202,7 +202,7 @@
                     <div class="row mb-1 align-items-center">
                         <Label Class="col-sm-3" For="item-thumbnail" HelpText="Enter the relative path to the thumbnail (optional)">Thumbnail Path: </Label>
                         <div class="col-sm-9">
-                            <input id="item-thumbnail" @bind="_activePhoto.ThumbnailPath" class="form-control" />
+                            <input id="item-thumbnail" @bind="_activePhoto.ThumbnailPath" class="form-control" maxlength="500" />
                         </div>
                     </div>
                     <div class="row mb-1 align-items-center">
