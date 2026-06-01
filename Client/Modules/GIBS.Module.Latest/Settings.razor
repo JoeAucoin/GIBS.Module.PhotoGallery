@@ -1,9 +1,15 @@
-@namespace GIBS.Module.PhotoGallery
+@namespace GIBS.Module.PhotoGallery.Latest
+@using GIBS.Module.PhotoGallery.Models
+@using GIBS.Module.PhotoGallery.Services
 @inherits ModuleBase
 @inject ISettingService SettingService
 @implements Oqtane.Interfaces.ISettingsControl
 @inject IStringLocalizer<Settings> Localizer
 @inject IFolderService FolderService
+@inject IModuleService ModuleService
+@inject IPageService PageService
+@inject IPageModuleService PageModuleService
+@inject IAlbumService AlbumService
 
 
 <div class="row mb-1 align-items-center">
@@ -22,6 +28,27 @@
     <Label Class="col-sm-3" For="showPhotoTitle" HelpText="Select which fields to show on the form" ResourceKey="ShowFields" ResourceType="@resourceType">Show Photo Title: </Label>
     <div class="col-sm-9">
         <input type="checkbox" id="showPhotoTitle" class="form-check-input" @bind="@_showPhotoTitle" />
+    </div>
+</div>
+
+<div class="row mb-1 align-items-center">
+    <Label Class="col-sm-3" For="displayIndexNumber" HelpText="Display the item index number in the carousel" ResourceKey="DisplayIndexNumber">Display Index Number: </Label>
+    <div class="col-sm-9">
+        <input type="checkbox" id="displayIndexNumber" class="form-check-input" @bind="@_displayIndexNumber" />
+    </div>
+</div>
+
+<div class="row mb-1 align-items-center">
+    <Label Class="col-sm-3" For="sortByModifiedOn" HelpText="Sort photos by ModifiedOn and override SortOrder when enabled">Sort By Modified On: </Label>
+    <div class="col-sm-9">
+        <input type="checkbox" id="sortByModifiedOn" class="form-check-input" @bind="@_sortByModifiedOn" />
+    </div>
+</div>
+
+<div class="row mb-1 align-items-center">
+    <Label Class="col-sm-3" For="showAllAlbumsPhotos" HelpText="Show photos from all albums and hide the albums view">Show All Albums Photos: </Label>
+    <div class="col-sm-9">
+        <input type="checkbox" id="showAllAlbumsPhotos" class="form-check-input" @bind="@_showAllAlbumsPhotos" />
     </div>
 </div>
 
@@ -50,12 +77,30 @@
         <input id="imageThumbHeight" type="number" class="form-control" @bind="@_imageThumbHeight" />
     </div>
 </div>
+
 <div class="row mb-1 align-items-center">
-   @*  //_moduleIdOfPhotoGallery *@
     <Label Class="col-sm-3" For="moduleIdOfPhotoGallery" HelpText="The module ID of the PhotoGallery" ResourceKey="ModuleIdOfPhotoGallery">Module ID of PhotoGallery: </Label>
     <div class="col-sm-9">
-        @* Re place following line with select list of available moduleIdOfPhotoGallery *@
-        <input id="moduleIdOfPhotoGallery" type="number" class="form-control" @bind="@_moduleIdOfPhotoGallery" />
+        <select id="moduleIdOfPhotoGallery" class="form-select" @bind="@_moduleIdOfPhotoGallery" @bind:after="OnPhotoGalleryModuleChanged">
+            <option value="">-- select a PhotoGallery module --</option>
+            @foreach (var module in _photoGalleryModules)
+            {
+                <option value="@module.ModuleId">@GetModuleDisplayText(module)</option>
+            }
+        </select>
+    </div>
+</div>
+
+<div class="row mb-1 align-items-center">
+    <Label Class="col-sm-3" For="albumId" HelpText="Select an album from the selected PhotoGallery module" ResourceKey="AlbumId">Album: </Label>
+    <div class="col-sm-9">
+        <select id="albumId" class="form-select" @bind="@_albumId" disabled="@(!_moduleIdOfPhotoGallery.HasValue)">
+            <option value="">-- select an album --</option>
+            @foreach (var album in _albums)
+            {
+                <option value="@album.AlbumId">@album.AlbumName</option>
+            }
+        </select>
     </div>
 </div>
 
@@ -64,21 +109,34 @@
     public override string Title => "PhotoGallery Settings";
 
 
+    private const string PhotoGalleryModuleDefinitionName = "PhotoGallery";
     private List<Folder> _folders = new List<Folder>();
+    private List<Module> _photoGalleryModules = new List<Module>();
+    private List<Album> _albums = new List<Album>();
     private string _fileFolderId;
     private string _imageThumbWidth;
     private string _imageThumbHeight;
     private string _imageMaxWidth;
     private string _imageMaxHeight;
     private bool _showPhotoTitle;
-    private int _moduleIdOfPhotoGallery;
+    private bool _displayIndexNumber;
+    private bool _sortByModifiedOn;
+    private bool _showAllAlbumsPhotos;
+    private int? _moduleIdOfPhotoGallery;
+    private int? _albumId;
+    private List<string> _photoGalleryModulePaths = new();
 
     protected override async Task OnInitializedAsync()
     {
         try
         {
             _folders = await FolderService.GetFoldersAsync(PageState.Site.SiteId);
-
+            _photoGalleryModules = (await ModuleService.GetModulesAsync(PageState.Site.SiteId))
+                .Where(module => string.Equals(module.ModuleDefinitionName, PhotoGalleryModuleDefinitionName, StringComparison.OrdinalIgnoreCase)
+                    || module.ModuleDefinitionName?.Contains("GIBS.Module.PhotoGallery", StringComparison.OrdinalIgnoreCase) == true)
+                .OrderBy(module => module.ModuleId)
+                .ToList();
+            
             Dictionary<string, string> settings = await SettingService.GetModuleSettingsAsync(ModuleState.ModuleId);
             _fileFolderId = SettingService.GetSetting(settings, "FileFolderId", "");
             _imageThumbWidth = SettingService.GetSetting(settings, "ImageThumbWidth", "360");
@@ -86,12 +144,28 @@
             _imageMaxWidth = SettingService.GetSetting(settings, "ImageMaxWidth", "1600");
             _imageMaxHeight = SettingService.GetSetting(settings, "ImageMaxHeight", "900");
             _showPhotoTitle = bool.Parse(SettingService.GetSetting(settings, "ShowPhotoTitle", "true"));
+            _displayIndexNumber = bool.Parse(SettingService.GetSetting(settings, "DisplayIndexNumber", "true"));
+            _sortByModifiedOn = bool.Parse(SettingService.GetSetting(settings, "SortByModifiedOn", "false"));
+            _showAllAlbumsPhotos = bool.Parse(SettingService.GetSetting(settings, "ShowAllAlbumsPhotos", "false"));
+            if (int.TryParse(SettingService.GetSetting(settings, "ModuleIdOfPhotoGallery", string.Empty), out var moduleId))
+            {
+                _moduleIdOfPhotoGallery = moduleId;
+            }
+
+            await LoadAlbumsAsync();
+
+            if (int.TryParse(SettingService.GetSetting(settings, "AlbumId", string.Empty), out var albumId) && _albums.Any(item => item.AlbumId == albumId))
+            {
+                _albumId = albumId;
+            }
         }
         catch (Exception ex)
         {
             AddModuleMessage(ex.Message, MessageType.Error);
         }
     }
+
+
 
     public async Task UpdateSettings()
     {
@@ -104,11 +178,38 @@
             SettingService.SetSetting(settings, "ImageMaxHeight", _imageMaxHeight);
             settings = SettingService.SetSetting(settings, "FileFolderId", _fileFolderId);
             settings = SettingService.SetSetting(settings, "ShowPhotoTitle", _showPhotoTitle.ToString());
+            settings = SettingService.SetSetting(settings, "DisplayIndexNumber", _displayIndexNumber.ToString());
+            settings = SettingService.SetSetting(settings, "SortByModifiedOn", _sortByModifiedOn.ToString());
+            settings = SettingService.SetSetting(settings, "ShowAllAlbumsPhotos", _showAllAlbumsPhotos.ToString());
+            settings = SettingService.SetSetting(settings, "ModuleIdOfPhotoGallery", _moduleIdOfPhotoGallery?.ToString() ?? string.Empty);
+            settings = SettingService.SetSetting(settings, "AlbumId", _albumId?.ToString() ?? string.Empty);
             await SettingService.UpdateModuleSettingsAsync(settings, ModuleState.ModuleId);
         }
         catch (Exception ex)
         {
             AddModuleMessage(ex.Message, MessageType.Error);
         }
+    }
+
+    private async Task OnPhotoGalleryModuleChanged()
+    {
+        _albumId = null;
+        await LoadAlbumsAsync();
+    }
+
+    private async Task LoadAlbumsAsync()
+    {
+        _albums = new List<Album>();
+        if (_moduleIdOfPhotoGallery.HasValue)
+        {
+            _albums = await AlbumService.GetAlbumsAsync(_moduleIdOfPhotoGallery.Value);
+        }
+    }
+
+    private static string GetModuleDisplayText(Module module)
+    {
+        var title = string.IsNullOrWhiteSpace(module.Title) ? module.ModuleDefinitionName : module.Title;
+        
+        return $"{module.ModuleId} - {title}";
     }
 }
