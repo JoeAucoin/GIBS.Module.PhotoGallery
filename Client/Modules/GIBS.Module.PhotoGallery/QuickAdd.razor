@@ -1,0 +1,315 @@
+﻿@using Microsoft.AspNetCore.Components
+@using Oqtane.Modules.Controls
+@using Oqtane.Models
+@using Oqtane.Services
+@using GIBS.Module.PhotoGallery.Models
+@using GIBS.Module.PhotoGallery.Services
+@using System.IO
+
+@namespace GIBS.Module.PhotoGallery
+@inherits ModuleBase
+@inject IAlbumService AlbumService
+@inject IPhotoService PhotoService
+@inject ISettingService SettingService
+@inject IFileService FileService
+@inject NavigationManager NavigationManager
+@inject IStringLocalizer<QuickAdd> Localizer
+@inject IJSRuntime JSRuntime
+
+<h3 class="mb-3">Quick Add Photo</h3>
+
+@if (_albums == null)
+{
+    <p><em>Loading...</em></p>
+}
+else if (_albums.Count == 0)
+{
+    <p>@Localizer["Message.DisplayNone"]</p>
+}
+else
+{
+    <form @ref="photoForm" class="@(photoValidated ? " was-validated" : "needs-validation")" novalidate>
+        <div class="container-fluid px-0">
+            <div class="row">
+                <div class="col-12 col-lg-8">
+                    <div class="card shadow-sm">
+                        <div class="card-body">
+                            <div class="row mb-3 align-items-center">
+                                <Label Class="col-12 col-md-3" For="album" HelpText="Select an album for the photo">Album: </Label>
+                                <div class="col-12 col-md-9">
+                                    <select id="album" @bind="_selectedAlbumId" class="form-select" required>
+                                        <option value="">-- Select Album --</option>
+                                        @foreach (var album in _albums)
+                                        {
+                                            <option value="@album.AlbumId">@album.AlbumName</option>
+                                        }
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="row mb-3 align-items-center">
+                                <Label Class="col-12 col-md-3" For="title" HelpText="Enter the photo title">Title: </Label>
+                                <div class="col-12 col-md-9">
+                                    <input id="title" @bind="_activePhoto.Title" class="form-control" maxlength="200" required />
+                                </div>
+                            </div>
+
+                            <div class="row mb-3 align-items-start">
+                                <Label Class="col-12 col-md-3" For="description" HelpText="Enter a description for the photo">Description: </Label>
+                                <div class="col-12 col-md-9">
+                                    <textarea id="description" @bind="_activePhoto.Description" class="form-control" rows="3" maxlength="2000"></textarea>
+                                </div>
+                            </div>
+
+                            <div class="row mb-3 align-items-start">
+                                <Label Class="col-12 col-md-3" For="upload" HelpText="Upload an image file">File: </Label>
+                                <div class="col-12 col-md-9">
+                                    <FileManager UploadMultiple="false" Filter="jpg,png,gif,jpeg,webp"
+                                                 FolderId="@_folderId"
+                                                 ShowSuccess="false" ShowFolders="false" ShowFiles="false" ShowImage="false" ShowUpload="true" 
+                                                 UploadOnSelect="true"
+                                                 OnUpload="@HandleFileUpload" />
+                                </div>
+                            </div>
+
+                            <div class="row mb-3 align-items-start">
+                                <Label Class="col-12 col-md-3" For="filepath" HelpText="Uploaded file path">File Path: </Label>
+                                <div class="col-12 col-md-9">
+                                    <input id="filepath" @bind="_activePhoto.FilePath" class="form-control" maxlength="500" required />
+                                    @if (!string.IsNullOrEmpty(_activePhoto.FilePath))
+                                    {
+                                        <img src="@_activePhoto.FilePath" alt="Preview" class="img-fluid mt-2" style="max-width: 280px; max-height: 200px;" />
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-12 col-lg-4 mt-3 mt-lg-0">
+                    <div class="card shadow-sm">
+                        <div class="card-body">
+                            <h5 class="card-title">Actions</h5>
+                            <div class="d-grid gap-2">
+                                <button type="button" class="btn btn-success" @onclick="SavePhoto">Save Photo</button>
+                                <button type="button" class="btn btn-secondary" @onclick="Cancel">Cancel</button>
+                            </div>
+                            <hr />
+                            <small class="text-muted">The photo will be saved to the selected album and you will be returned to the gallery.</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+}
+
+@code {
+    [Parameter]
+    public int AlbumId { get; set; } = -1;
+
+    public override SecurityAccessLevel SecurityAccessLevel => SecurityAccessLevel.Edit;
+
+    public override List<Resource> Resources => new List<Resource>()
+    {
+        new Resource { ResourceType = ResourceType.Stylesheet, Url = ModulePath() + "Module.css?v=1.14" }
+    };
+
+    private ElementReference photoForm;
+    private bool photoValidated;
+    private List<Album> _albums;
+    private Photo _activePhoto;
+    private int? _selectedAlbumId;
+    private int _folderId;
+    private int _imageThumbWidth;
+    private int _imageThumbHeight;
+    private int _imageMaxWidth;
+    private int _imageMaxHeight;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var settings = await SettingService.GetModuleSettingsAsync(ModuleState.ModuleId);
+            _folderId = int.Parse(SettingService.GetSetting(settings, "FileFolderId", "1"));
+            _imageThumbWidth = int.Parse(SettingService.GetSetting(settings, "ImageThumbWidth", "360"));
+            _imageThumbHeight = int.Parse(SettingService.GetSetting(settings, "ImageThumbHeight", "360"));
+            _imageMaxWidth = int.TryParse(SettingService.GetSetting(ModuleState.Settings, "ImageMaxWidth", "1600"), out var maxWidth) ? maxWidth : 1600;
+            _imageMaxHeight = int.TryParse(SettingService.GetSetting(ModuleState.Settings, "ImageMaxHeight", "900"), out var maxHeight) ? maxHeight : 900;
+
+            _albums = await AlbumService.GetAlbumsAsync(ModuleState.ModuleId);
+
+            var selectedAlbumId = AlbumId;
+            if (selectedAlbumId <= 0 && PageState.QueryString.ContainsKey("album") && int.TryParse(PageState.QueryString["album"], out var queryAlbumId))
+            {
+                selectedAlbumId = queryAlbumId;
+            }
+
+            if (selectedAlbumId > 0)
+            {
+                _selectedAlbumId = selectedAlbumId;
+            }
+
+            InitializePhoto();
+        }
+        catch (Exception ex)
+        {
+            await logger.LogError(ex, "Error Loading Quick Add {Error}", ex.Message);
+            AddModuleMessage(Localizer["Message.LoadError"], MessageType.Error);
+        }
+    }
+
+    private void InitializePhoto()
+    {
+        _activePhoto = new Photo
+        {
+            ModuleId = ModuleState.ModuleId,
+            IsActive = true,
+            MediaType = "Image",
+            AlbumId = _selectedAlbumId
+        };
+    }
+
+    private async Task HandleFileUpload(int fileId)
+    {
+        var uploadedFile = await FileService.GetFileAsync(fileId);
+        if (uploadedFile == null)
+        {
+            AddModuleMessage("Could not retrieve file details after upload.", MessageType.Error);
+            return;
+        }
+
+        if (uploadedFile.ImageWidth > _imageMaxWidth || uploadedFile.ImageHeight > _imageMaxHeight)
+        {
+            var resized = await PhotoService.ResizeImageAsync(uploadedFile.FileId, _imageMaxWidth, _imageMaxHeight, ModuleState.ModuleId);
+            if (resized == null)
+            {
+                AddModuleMessage("There was an error resizing the image.", MessageType.Error);
+                return;
+            }
+
+            uploadedFile = await FileService.GetFileAsync(uploadedFile.FileId);
+        }
+
+        _activePhoto.FileId = uploadedFile.FileId;
+        _activePhoto.FilePath = uploadedFile.Url;
+
+        try
+        {
+            var newFileName = $"{uploadedFile.FileId}_{uploadedFile.Name}".Replace(" ", "_");
+            newFileName = System.Text.RegularExpressions.Regex.Replace(newFileName, @"[^a-zA-Z0-9_\-\.]", "");
+
+            var renamedFile = await RenameFile(fileId, newFileName);
+            if (renamedFile == null)
+            {
+                return;
+            }
+
+            _activePhoto.FileId = renamedFile.FileId;
+            _activePhoto.FilePath = renamedFile.Url;
+
+            if (string.IsNullOrWhiteSpace(_activePhoto.Title))
+            {
+                var title = Path.GetFileNameWithoutExtension(renamedFile.Name);
+                title = System.Text.RegularExpressions.Regex.Replace(title, @"^[0-9]+_", string.Empty).Trim();
+                _activePhoto.Title = title.Replace("_", " ");
+            }
+
+            var imageType = Path.GetExtension(renamedFile.Name);
+            imageType = imageType.StartsWith(".") ? imageType[1..] : imageType;
+            _activePhoto.MediaType = imageType.ToUpperInvariant();
+
+            var thumbnail = await PhotoService.CreateImageThumbnailAsync(_activePhoto.FileId, _imageThumbWidth, _imageThumbHeight, ModuleState.ModuleId);
+            _activePhoto.ThumbnailFileId = thumbnail?.FileId;
+            _activePhoto.ThumbnailPath = thumbnail?.Url;
+        }
+        catch (Exception ex)
+        {
+            await logger.LogError(ex, "Error saving file information: {Error}", ex.Message);
+            AddModuleMessage("There was an error saving the file information.", MessageType.Error);
+        }
+
+        StateHasChanged();
+    }
+
+    private async Task<Oqtane.Models.File> RenameFile(int fileId, string newFileName)
+    {
+        try
+        {
+            var uploadedFile = await FileService.GetFileAsync(fileId);
+            if (uploadedFile != null)
+            {
+                uploadedFile.Name = newFileName;
+                return await FileService.UpdateFileAsync(uploadedFile);
+            }
+        }
+        catch (Exception ex)
+        {
+            await logger.LogError(ex, "Error renaming file {FileId}: {Error}", fileId, ex.Message);
+        }
+
+        return null;
+    }
+
+    private async Task SavePhoto()
+    {
+        try
+        {
+            photoValidated = true;
+            var interop = new Oqtane.UI.Interop(JSRuntime);
+            if (!await interop.FormValid(photoForm))
+            {
+                AddModuleMessage(Localizer["Message.SaveValidation"], MessageType.Warning);
+                return;
+            }
+
+            if (_selectedAlbumId == null || _selectedAlbumId <= 0)
+            {
+                AddModuleMessage("Please select an album.", MessageType.Warning);
+                return;
+            }
+
+            _activePhoto.AlbumId = _selectedAlbumId;
+            _activePhoto.Tags = null;
+            _activePhoto.SortOrder = await GetNextSortOrderAsync(_selectedAlbumId.Value);
+
+            if (_activePhoto.PhotoId == 0)
+            {
+                var newPhoto = await PhotoService.AddPhotoAsync(_activePhoto);
+                await logger.LogInformation("Photo Added {Photo}", newPhoto);
+                _activePhoto.PhotoId = newPhoto.PhotoId;
+            }
+            else
+            {
+                await PhotoService.UpdatePhotoAsync(_activePhoto);
+                await logger.LogInformation("Photo Updated {Photo}", _activePhoto);
+            }
+
+            NavigationManager.NavigateTo(BuildReturnUrl());
+        }
+        catch (Exception ex)
+        {
+            await logger.LogError(ex, "Error Saving Photo {Error}", ex.Message);
+            AddModuleMessage(Localizer["Message.SaveError"], MessageType.Error);
+        }
+    }
+
+    private async Task<int> GetNextSortOrderAsync(int albumId)
+    {
+        var photos = await PhotoService.GetPhotosAsync(ModuleState.ModuleId);
+        var albumPhotos = photos.Where(photo => photo.AlbumId == albumId).ToList();
+        return albumPhotos.Any() ? albumPhotos.Max(photo => photo.SortOrder) + 10 : 10;
+    }
+
+    private void Cancel()
+    {
+        NavigationManager.NavigateTo(BuildReturnUrl());
+    }
+
+    private string BuildReturnUrl()
+    {
+        return _selectedAlbumId.HasValue && _selectedAlbumId.Value > 0
+            ? $"{NavigateUrl()}?album={_selectedAlbumId.Value}#top"
+            : NavigateUrl();
+    }
+}

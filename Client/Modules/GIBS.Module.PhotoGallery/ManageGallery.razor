@@ -185,6 +185,7 @@
                             <FileManager UploadMultiple="false" Filter="jpg,png,gif,jpeg"
                                          FolderId="@_folderId"
                                          ShowSuccess="false" ShowFolders="false" ShowFiles="false" ShowImage="false" ShowUpload="true"
+                                         UploadOnSelect="true"
                                          OnUpload="@HandleFileUpload" />
                         </div>
                     </div>
@@ -238,7 +239,7 @@
             <div class="row mb-3">
                 <div class="col-md-2 offset-md-3">
                     <select id="statusFilter" class="form-select" @bind="SelectedAlbum">
-                        <option value="">All Albums</option>
+                        <option value="0">All Albums</option>
                         @if (_albums != null)
                         {
                             @foreach (var album in _albums)
@@ -403,8 +404,9 @@
         }
     }
 
-    private void ApplyFilters()
+    private async Task ApplyFilters()
     {
+        await ClearFilters();
         IEnumerable<Photo> query = _photos;
 
         if (_selectedAlbum > 0)

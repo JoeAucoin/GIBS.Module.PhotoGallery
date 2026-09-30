@@ -80,6 +80,7 @@ else
                 </h3>
             </div>
             <div class="col-md-2 text-end">
+                <ActionLink Action="QuickAdd" Security="SecurityAccessLevel.Edit" IconName="oi oi-plus" IconOnly="true" Text="Quick Add" ResourceKey="QuickAdd" />
                 <a href="@NavigateUrl()" class="btn btn-secondary mb-3">Back to Albums</a>
             </div>
         </div>
@@ -264,6 +265,9 @@ else
         new Resource { ResourceType = ResourceType.Stylesheet, Url = ModulePath() + "Module.css?v=1.14" }
     };
 
+    [Parameter]
+    public int AlbumId { get; set; } = -1;
+
     private List<PhotoAlbum> _albums;
     private List<PhotoAlbum> _subAlbums;
     private List<Photo> _items;
@@ -286,9 +290,15 @@ else
             _defaultPageTitle = PageState.Page.Title;
             var settings = await SettingService.GetModuleSettingsAsync(ModuleState.ModuleId);
             _showPhotoTitle = bool.Parse(SettingService.GetSetting(settings, "ShowPhotoTitle", "true"));
-            if (PageState.QueryString.ContainsKey("album") && int.TryParse(PageState.QueryString["album"], out var albumId))
+            var selectedAlbumId = AlbumId;
+            if (selectedAlbumId == -1 && PageState.QueryString.ContainsKey("album") && int.TryParse(PageState.QueryString["album"], out var albumId))
             {
-                _albumId = albumId;
+                selectedAlbumId = albumId;
+            }
+
+            if (selectedAlbumId != -1)
+            {
+                _albumId = selectedAlbumId;
                 _selectedTag = PageState.QueryString.ContainsKey("tag") ? System.Uri.UnescapeDataString(PageState.QueryString["tag"]) : null;
                 await LoadAlbumItems();
 
@@ -380,8 +390,9 @@ else
     {
         _albums = await PhotoService.GetPhotoAlbumsAsync(ModuleState.ModuleId);
         var albumEntities = await AlbumService.GetAlbumsAsync(ModuleState.ModuleId);
+        var albumLookup = albumEntities.ToDictionary(a => a.AlbumId, a => a);
         var topLevelAlbumIds = albumEntities.Where(a => a.ParentAlbumId == null).Select(a => a.AlbumId).ToHashSet();
-        _albums = _albums.Where(a => topLevelAlbumIds.Contains(a.AlbumId)).ToList();
+        _albums = _albums.Where(a => topLevelAlbumIds.Contains(a.AlbumId)).OrderBy(a => albumLookup.TryGetValue(a.AlbumId, out var album) ? album.SortOrder : int.MaxValue).ToList();
         _subAlbums = null;
         var firstAlbum = _albums.FirstOrDefault();
         if (firstAlbum != null)
@@ -464,7 +475,7 @@ else
             _tagCounts = new Dictionary<string, int>();
         }
 
-        var childAlbums = albumEntities.Where(a => a.ParentAlbumId == _albumId && a.IsActive).ToList();
+        var childAlbums = albumEntities.Where(a => a.ParentAlbumId == _albumId && a.IsActive).OrderBy(a => a.SortOrder).ToList();
         _subAlbums = childAlbums
             .Select(album =>
             {

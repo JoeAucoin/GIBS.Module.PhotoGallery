@@ -9,9 +9,9 @@ namespace GIBS.Module.PhotoGallery
         {
             Name = "PhotoGallery",
             Description = "Oqtane Photo Gallery",
-            Version = "1.0.1",
+            Version = "1.0.2",
             ServerManagerType = "GIBS.Module.PhotoGallery.Manager.PhotoGalleryManager, GIBS.Module.PhotoGallery.Server.Oqtane",
-            ReleaseVersions = "1.0.0,1.0.1",
+            ReleaseVersions = "1.0.0,1.0.1,1.0.2",
             Dependencies = "GIBS.Module.PhotoGallery.Shared.Oqtane",
             PackageName = "GIBS.Module.PhotoGallery" 
         };
