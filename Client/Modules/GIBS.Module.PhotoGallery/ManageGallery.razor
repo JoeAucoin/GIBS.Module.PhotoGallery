@@ -142,7 +142,7 @@
                     <div class="row mb-1 align-items-center">
                         <Label Class="col-sm-3" For="item-title" HelpText="Enter the photo title">Title: </Label>
                         <div class="col-sm-9">
-                            <input id="item-title" @bind="_activePhoto.Title" class="form-control" maxlength="200" required />
+                            <input id="item-title" @ref="_titleInput" @bind="_activePhoto.Title" class="form-control" maxlength="200" required />
                         </div>
                     </div>
                     <div class="row mb-1 align-items-center">
@@ -300,6 +300,7 @@
 
     private List<Album> _albums;
     private List<Photo> _photos;
+    private List<Photo> _allPhotos;
     private List<Tags> _tags;
     private List<PhotoTags> _photoTags;
     private Album _activeAlbum;
@@ -312,7 +313,9 @@
     private int _imageMaxWidth;
     private int _imageMaxHeight;
     private ElementReference photoForm;
+    private ElementReference _titleInput;
     private bool photoValidated;
+    private bool _focusTitleInput;
     private ElementReference albumForm;
     private bool albumValidated;
 
@@ -406,15 +409,14 @@
 
     private async Task ApplyFilters()
     {
-        await ClearFilters();
-        IEnumerable<Photo> query = _photos;
+        IEnumerable<Photo> query = _allPhotos ?? new List<Photo>();
 
         if (_selectedAlbum > 0)
         {
             query = query.Where(r => r.AlbumId == _selectedAlbum);
         }
 
-        _photos = query.ToList();
+        _photos = query.OrderBy(i => i.AlbumName).ThenBy(i => i.SortOrder).ToList();
         _ = SaveFiltersAsync();
         StateHasChanged();
     }
@@ -422,7 +424,7 @@
     private async Task ClearFilters()
     {
         _selectedAlbum = 0;
-        await LoadPhotos();
+        await ApplyFilters();
     }
 
     private async Task HandleFileUpload(int fileId)
@@ -587,11 +589,11 @@
 
     private async Task LoadPhotos()
     {
-        _photos = await PhotoService.GetPhotosAsync(ModuleState.ModuleId);
+        _allPhotos = await PhotoService.GetPhotosAsync(ModuleState.ModuleId);
         await LoadTags();
         if (_albums != null)
         {
-            foreach (var photo in _photos)
+            foreach (var photo in _allPhotos)
             {
                 if (photo.AlbumId.HasValue)
                 {
@@ -614,6 +616,8 @@
                 }
             }
         }
+
+        await ApplyFilters();
     }
 
     private async Task DeletePhoto(Photo photo)
@@ -643,6 +647,7 @@
         {
             _activePhoto.AlbumId = SelectedAlbum;
         }
+        _focusTitleInput = true;
         UpdatePhotoSortOrder();
     }
 
@@ -682,6 +687,7 @@
             ModifiedBy = photo.ModifiedBy,
             ModifiedOn = photo.ModifiedOn
         };
+        _focusTitleInput = true;
     }
 
     private async Task SaveAndAddNew()
@@ -690,6 +696,15 @@
         AddPhoto();
 
     }   
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_focusTitleInput && _activePhoto != null)
+        {
+            _focusTitleInput = false;
+            await JS.InvokeVoidAsync("eval", "document.getElementById('item-title')?.focus();");
+        }
+    }
 
     private async Task SavePhoto()
     {
@@ -720,12 +735,12 @@
             await ProcessTags();
 
             await LoadPhotos();
-            ApplyFilters();
             _activePhoto = null;
             photoValidated = false;
-            
+            _focusTitleInput = false;
+
             StateHasChanged();
-            
+
         }
         catch (Exception ex)
         {
